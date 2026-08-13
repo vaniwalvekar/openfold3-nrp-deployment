@@ -1,0 +1,48 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: openfold3-real-run
+spec:
+  template:
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: nvidia.com/gpu.product
+                operator: In
+                values:
+                - NVIDIA-A10
+      containers:
+        - name: openfold3
+          image: vaniwalvekar/openfold3-vani:cuda12
+          command: ["/bin/bash", "-c"]
+          args:
+            - "source /opt/activate.sh && cd /opt/openfold3 && yes | run_openfold predict --query-json examples/example_inference_inputs/query_ubiquitin.json --use-msa-server=true --output-dir /data/output"
+          resources:
+            limits:
+              nvidia.com/gpu: "1"
+              memory: "16Gi"
+              cpu: "4"
+              ephemeral-storage: "20Gi"
+            requests:
+              nvidia.com/gpu: "1"
+              memory: "16Gi"
+              cpu: "4"
+              ephemeral-storage: "10Gi"
+          volumeMounts:
+            - name: storage
+              mountPath: /data
+            - name: dshm
+              mountPath: /dev/shm
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: openfold3-storage
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 4Gi
+      restartPolicy: Never
+  backoffLimit: 1
